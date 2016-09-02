@@ -13,8 +13,9 @@ peer can get a chance to find that piece.
 The program should work everytime without having to change the peers manually like I suggested last time. manager is in charge of
 parsing the list of peers and only downloading from the one with the IP address "128.6.171.131". 
 
-I also attached the output to this program. It's called booboo.mov. 
+I attached the output to this program. It's called output.mov. 
 
+In the terminal window,
 
 Compile:  javac RUBTClient.java
 
