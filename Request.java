@@ -26,14 +26,14 @@ length: integer specifying the requested length.  */
 	//the sendMessage() in the Message class already sent the length prefix and messageID to the peer.
 	//this function sends the payload
 	public void SendPayLoad(DataOutputStream dataOutputStream){
-		System.out.println("Request sendpayload was called");
+		//System.out.println("Request sendpayload was called");
 		try {
 			dataOutputStream.writeInt(index);
 			dataOutputStream.writeInt(begin);
 			dataOutputStream.writeInt(requestedLength);
-			System.out.println("Request payload has been sent");
+			//System.out.println("Request payload has been sent");
 		} catch (IOException e) {
-			System.err.println("Unable to send Request payload");
+			//System.err.println("Unable to send Request payload");
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

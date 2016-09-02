@@ -14,7 +14,6 @@ public class Bitfield extends Message {
 	
 	public void PrintMessage(){
 		System.out.print("Length Prefix: "+length+"  ID: "+ID+ "  Payload: bitfield");
-		System.out.println();
 		return;
 	}
 

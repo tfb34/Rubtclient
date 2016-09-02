@@ -14,7 +14,6 @@ public class Piece extends Message {
 	
 	public void PrintMessage(){
 		System.out.print("Length Prefix: "+length+"  ID: "+ID+ "  Payload: <index = "+index+"><begin = "+begin+"><block = "+block.length+">");
-		System.out.println();
 		return;
 	}
 }

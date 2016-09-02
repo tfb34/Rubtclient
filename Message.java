@@ -1,6 +1,5 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.EOFException;
 import java.io.IOException;
 import java.net.Socket;
 
@@ -9,7 +8,7 @@ import java.net.Socket;
 public class Message {
 /*Types of messages and their Ids*/
     //keepAlive has no ID 
-	public static final byte KEEPALIVE_ID = -1; 
+	public static final byte KEEPALIVE_ID = -1; // meaning keepalive msgs don't have IDs
 	public static final byte CHOKE_ID = 0;
 	public static final byte UNCHOKE_ID = 1;
 	public static final byte INTERESTED_ID = 2;
@@ -54,7 +53,8 @@ public class Message {
 	// msg before writing it to the Peer), decoding.. thats all i got so far
 	
 	/*Encoding message in order to send it to Peer*/
-	//@Param: Message and dataOutputStream
+	//what are we encoding? a message 
+	//@Param: Message and OutputStream
 	// so far only sends length prefix and message ID to peer
 	public static boolean SendMessage(Message message, DataOutputStream dataOutputStream){
 		if(message == null){
@@ -79,13 +79,16 @@ public class Message {
 		}return true;
 	}
 	
-
+	/*@Param: inputstream ,
+	 * @return: a Message object
+	 reads from inputstream and creates a message 
+	 don't forget to check if there is a payload, if there is you have to add it
+	 need to two contructors for Message. one that contains the payload*/
    public static Message GetAndDecodeMessage(DataInputStream dataInputStream, Socket socket, int blockLength){
 	    try {
 	    	//DataInputStream dataInputStream = new DataInputStream(inputStream);
-	    
+	    	//not sure if we are to expect keep alive msgs
 	    	socket.setSoTimeout(150000);
-	    	
 			int lengthPrefix = dataInputStream.readInt();
 			if(lengthPrefix == 0){//if true then it's a keep alive Message
 				Message message = new Message(lengthPrefix, (byte)-1);
@@ -94,7 +97,6 @@ public class Message {
 				// the message consists of an ID
 				byte messageID = dataInputStream.readByte();
 				//use switch message to determine what message to return 
-				System.out.println("MessageID ="+messageID);
 				switch(messageID){// check if it falls from 0 to 11
 				case(CHOKE_ID)://no payload
 					return CHOKE_MSG;
@@ -123,7 +125,6 @@ public class Message {
 				    dataInputStream.readFully(block);
 				    
 				    Message pieceMsg = new Piece(index,begin, block);
-					pieceMsg.PrintMessage();
 					return pieceMsg;
 				case(CANCEL_ID):
 					System.out.println("you got a cancel msg");
@@ -159,6 +160,12 @@ public class Message {
    
    /**/
 }
+
+
+
+
+
+
 
 
 

@@ -21,6 +21,7 @@ public class Peer extends Thread{
 	private TorrentInfo torrentInfo;
 	private int numPieces;
 	private boolean[] peerBitfield;
+	Manager manager;
 	Thread t;
    /*newly added*/
 	
@@ -28,7 +29,7 @@ public class Peer extends Thread{
    /*1) peer should be able to send handshake*/
 
 
-	public Peer( byte[] peerid, String ip, int port, Tracker tracker, LockedVariables lockedVariables){
+	public Peer( byte[] peerid, String ip, int port, Tracker tracker, LockedVariables lockedVariables, Manager manager){
 		this.peerid=peerid;
 		this.ip=ip;
 		this.port=port;
@@ -36,9 +37,10 @@ public class Peer extends Thread{
 		this.lockedVariables =  lockedVariables;
 		this.torrentInfo = tracker.torrentInfo;
 		this.numPieces = torrentInfo.file_length/torrentInfo.piece_length;// does not include the last piece
+		this.manager = manager;
 	}
 	
-	public void run(){
+	public void run(){//the computer should send a handshake 
 		 /*open socket, open streams to write/read to and fro*/
 		try {
 			socket = new Socket(ip,port);
@@ -49,7 +51,7 @@ public class Peer extends Thread{
      	    	System.out.println("handshake complete");
      	    	/*PEER SENDS YOU A BITFIELD MSG*/
           	  Message m = Message.GetAndDecodeMessage(dataInputStream,socket, -1);
-          	  m.PrintMessage();
+          	  //m.PrintMessage();
           	  Bitfield m2 =(Bitfield)m;
           	  m2.PrintMessage();
           	  //obtain the peer Bitfield for later use
@@ -61,18 +63,18 @@ public class Peer extends Thread{
           	  
           	  /*SEND INTERESTED MSG*/
 	          	if(Message.SendMessage(Message.INTERESTED_MSG, dataOutputStream)){
-	     		   System.out.println("sent Interested msg");
+	     		   System.out.println("\n sent Interested msg");
 	     	   }
 	          	/*PEER SENDS YOU  AN UNCHOKE MSG*/
           	    Message k = Message.GetAndDecodeMessage(dataInputStream,socket, -1);
           	     k.PrintMessage();
           	   /*send first request*/
-	           	  System.out.println("piece length: "+torrentInfo.piece_length);
-	           	  System.out.println("GETTING PIECES");
+	           	  //System.out.println("piece length: "+torrentInfo.piece_length);
+	           	  //System.out.println("Download starting..");
 	           	  //start downloading time start
 	           	  Download();
 	           	  //end downloading time
-	           	  System.out.println("Download is done");
+	           	  //System.out.println("Download is done");
 	           	  
      	    }else{//if handshake did not work then close connection with peer
      	    	try{
@@ -96,7 +98,7 @@ public class Peer extends Thread{
 			System.out.println("ByteArrayOutputStream is null. cannot send handshake.");
 			return false;
 		}else{
-			 byte pstr = (byte) 19;//1 byte
+			 byte pstr = (byte) 19;
      	     try {
      	    	outputStream.write(pstr);
 				outputStream.write(identifierProtocol);
@@ -122,7 +124,6 @@ public class Peer extends Thread{
         	    /*make sure tracker info hash and this info hash returned in messageReturned are the same */
          	     byte[] hinfo = Arrays.copyOfRange(messageReturned, 28, 48);//last index is excluded
         	    if(Arrays.equals(hinfo, infoHash)){
-         		   System.out.println("handshake complete");
          		   return true;
          	    } else{
          		   System.err.println("info_hash do not match");
@@ -139,6 +140,9 @@ public class Peer extends Thread{
 	}
 	
 	
+	
+	
+	//***********************************
     public boolean PeerConnect(){
     	try {
 			socket = new Socket(ip,port);
@@ -149,11 +153,10 @@ public class Peer extends Thread{
      	    	System.out.println("handshake complete");
      	    	/*PEER SENDS YOU A BITFIELD MSG*/
           	  Message m = Message.GetAndDecodeMessage(dataInputStream,socket,-1);
-          	  m.PrintMessage();
+          	 // m.PrintMessage();
           	  Bitfield m2 =(Bitfield)m;
-          	  System.out.println("bitfield length m2: "+ m2.length);
-          	  
-              /*SEND INTERESTED MSG*/
+          	  m2.PrintMessage();
+          	  /*SEND INTERESTED MSG*/
 	          	if(Message.SendMessage(Message.INTERESTED_MSG, dataOutputStream)){
 	     		   System.out.println("sent Interested msg");
 	     	   }
@@ -219,18 +222,20 @@ public class Peer extends Thread{
 				    		}
 				    	  lockedVariables.piecesDownloaded[pieceIndex] = piece;//put piece in the 2d array
 				    	  lockedVariables.updateBitfield(pieceIndex); // update bitfield 
+				    	  this.manager.updatePiecesDownloaded();
 				    	}
 			    	}else{//peer does not have piece
 			    		lockedVariables.PutPieceIndexBack(pieceIndex);//return pieceIndex so another Peer object  can download it 
 			    	}
 			    }else{//pieceIndex is that of the last piece
 			    	if(peerBitfield[pieceIndex]){
-				    	System.out.println("there is a piece that is smaller than the specified piece_length");
+				    	//System.out.println("there is a piece that is smaller than the specified piece_length");
 				    	int remainderBlocks = torrentInfo.file_length%torrentInfo.piece_length;
 				    	byte[] piece = GetThatPiece(pieceIndex, remainderBlocks);
 					    	if(piece!= null){
 					    		lockedVariables.piecesDownloaded[pieceIndex] = piece;//put piece in the 2d array
 					    		lockedVariables.updateBitfield(pieceIndex);//update bitfield
+					    		this.manager.updatePiecesDownloaded();
 					    		return;//temporary solution 
 					    	}
 			    	}else{
@@ -240,10 +245,7 @@ public class Peer extends Thread{
 			
 			
 		}
-	}//End of Download()
-	//void
-	//while(true), get element from queue%lock,  use get that piece function, obtain the piece/ byte[], verify if not last piece, put piece in 2-d array%lock, update bitfield%lock
-	
+	}
 	
 	public byte[] GetThatPiece(int index, int pieceLength){
 		byte[] piece = new byte[pieceLength];
@@ -251,7 +253,7 @@ public class Peer extends Thread{
 		int numblocks = pieceLength/16384;
 		int remainderBytes = pieceLength%16384;
 		int begin = 0; // position of where to put the block in the piece byte[]
-		System.out.println("piecelength("+pieceLength+")"+"/"+"16384"+"="+numblocks);
+		//System.out.println("piecelength("+pieceLength+")"+"/"+"16384"+"="+numblocks);
 		
 		
 			for(int i = 0; i<numblocks; i++){
@@ -263,6 +265,7 @@ public class Peer extends Thread{
 		
 					/*Retrieve the peer message*/
 					Message msgReturned = Message.GetAndDecodeMessage(dataInputStream,socket, 16384);
+					/*if the msg is piece great, if not print the message and return false*/
 					if(msgReturned.ID == Message.PIECE_ID){
 						/*get the block byte[] that the piece msg has*/
 						byte[] theBlock = ((Piece)msgReturned).block;
@@ -270,7 +273,7 @@ public class Peer extends Thread{
 						target.put(theBlock);
 			            begin += 16384;
 					}else{
-						System.out.println("Message returned in GetThatBlock() was not a piece message");
+						//System.out.println("Message returned in GetThatBlock() was not a piece message");
 						return null;
 					}
 				} 
@@ -278,9 +281,10 @@ public class Peer extends Thread{
 		/*takes care of those blocks that are less than 16384*/
 		
 		if(remainderBytes !=0){
-			System.out.println("piece length requested: "+ remainderBytes);
+			
+			//System.out.println("piece length requested: "+ remainderBytes);
 			Request requestMsg = new Request(index, begin, remainderBytes);
-			requestMsg.PrintMessage();
+			//requestMsg.PrintMessage();
 			Message.SendMessage(requestMsg, dataOutputStream);
 			Message msgReturned = Message.GetAndDecodeMessage(dataInputStream,socket,remainderBytes);
 				if(msgReturned == null){

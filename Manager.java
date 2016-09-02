@@ -7,30 +7,22 @@ import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-//wait for 132, filter out 130
-//ram used to store what was downloaded even if incomplete
-/*this class manages a peer*/
-/*1) should */
-// create a class that contains all the variables that will be accessed by different threads
+
+
+
 public class Manager extends Thread {
-  /*the pieces that have not been downloaded. only their piece numbers are in the list*/
-  // Queue<Integer> queue = new LinkedList<Integer>();
-  /*Pieces downloaded*/
-  // byte[][] piecesDownloaded;
-  /*Tracker object, contains the our generated peerID sent to the tracker*/
+ 
 	LockedVariables lockedVariables;
     Tracker tracker;
-  /*obtains information on */
+ 
    HashMap<ByteBuffer, Object> response;
    /*list of Peers with ID 'RU11"*/
    ArrayList<Peer> listOfValidPeers= new ArrayList<Peer>();
    ArrayList<Thread> threadList = new ArrayList<Thread>();
     byte[] theFile ;
-	//ByteBuffer target = ByteBuffer.wrap(theFile); use this when all the threads finish so after the join() 
 	int numPieces;
+	int numPiecesDownloaded=0;
+	
 	ServerSocket serverSocket;
 	int listenPort = -1;
 	File output = null;
@@ -41,19 +33,47 @@ public class Manager extends Thread {
 		  this.lockedVariables= new LockedVariables(numPieces);
 		  this.output = output;
 	  }
+	  
+	  public synchronized void updatePiecesDownloaded(){
+		  this.numPiecesDownloaded += 1;
+		  
+	  }
+	  
+	  
 	  public void run(){
 		  response = tracker.getResponse();
 		  if(response == null){
 			  System.out.println("Unable to retrieve dictionary from tracker");
 			  return;
 		  }
-		  
+		  // I want to create a thread that continuously prints out the progress until 100%
 		  if(response.containsKey(Utils.KEY_INTERVAL)){
+			    Thread t1 = new Thread(new Runnable(){
+			    	public void run(){
+			    		try {
+							PrintProgress();
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+			    	}
+			    });
+			    t1.start();
 	            ConnectToPeers();
 		  }
 		  writeToFile();
 		
 		  
+	  }
+	  
+	  public void PrintProgress() throws InterruptedException{
+		  while(this.numPiecesDownloaded<this.numPieces){// ex . 2 pieces out of 434 are downloaded
+			  Thread.sleep(1000);
+			  double x = (double)numPiecesDownloaded/ (double)this.numPieces;
+			  x = x*100;
+			  System.out.print("\r[");
+			  System.out.print("Downloading... "+(int)x+"%");
+		  }
 	  }
 	  public void writeToFile(){
 		  FileOutputStream out;
@@ -98,9 +118,9 @@ public class Manager extends Thread {
 							    
 							     if(IPAddress.equals("128.6.171.131")){// only creates peers/downloaders with this IP address
 									     int peerPort = (int)peerDictionary.get(Utils.KEY_PORT);//peer Port
-										 Peer peer = new Peer(peerId, IPAddress, peerPort,tracker, lockedVariables);//if im correct all the peers have access to the same lockedVariables
+										 Peer peer = new Peer(peerId, IPAddress, peerPort,tracker, lockedVariables, this);//if im correct all the peers have access to the same lockedVariables
 										 listOfValidPeers.add(peer);
-							     }//else create a different type of peer that wants to download from you
+							     }
 							}
 					
 					}catch(UnsupportedEncodingException e){
@@ -127,9 +147,11 @@ public class Manager extends Thread {
 				}
 			  }
 			  long end = System.currentTimeMillis();
-			  System.out.println("Total Downloading time: "+ (end-start));
+			  System.out.println("\nTotal Downloading time: "+ (end-start));
 			
 			  
 			  
 	  }
+	  
+	  
 }
